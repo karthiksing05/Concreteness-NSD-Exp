@@ -14,7 +14,7 @@ Usage:
         --scores data/nsd_image_scores.csv \
         --output results/rsa_results/ \
         [--nsd_root /path/to/nsd] \
-        [--subjects sub-01 sub-02 ...] \
+        [--subjects subj01 subj02 ...] \
         [--rois nsdgeneral V1v V2v V3v hV4 LOC PPA RSC] \
         [--fdr_q 0.05]
 """
@@ -229,8 +229,8 @@ def main():
     parser.add_argument(
         "--subjects",
         nargs="+",
-        default=[f"sub-{i:02d}" for i in range(1, 9)],
-        help="Subject IDs.",
+        default=[f"subj{i:02d}" for i in range(1, 9)],
+        help="Subject IDs (default: subj01 through subj08).",
     )
     parser.add_argument(
         "--rois",

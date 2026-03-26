@@ -12,7 +12,7 @@ Usage:
         --betas results/beta_maps/ \
         --scores data/nsd_image_scores.csv \
         --output results/ \
-        [--subjects sub-01 sub-02 ...] \
+        [--subjects subj01 subj02 ...] \
         [--fdr_q 0.05]
 """
 
@@ -207,8 +207,8 @@ def main():
     parser.add_argument(
         "--subjects",
         nargs="+",
-        default=[f"sub-{i:02d}" for i in range(1, 9)],
-        help="Subject IDs.",
+        default=[f"subj{i:02d}" for i in range(1, 9)],
+        help="Subject IDs (default: subj01 through subj08).",
     )
     parser.add_argument(
         "--fdr_q",

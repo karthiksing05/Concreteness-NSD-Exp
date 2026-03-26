@@ -12,7 +12,7 @@ Usage:
         --image_ids data/selected_image_ids.csv \
         --nsd_root /path/to/nsd \
         --output results/beta_maps/ \
-        [--subjects sub-01 sub-02 ...] \
+        [--subjects subj01 subj02 ...] \
         [--space fsaverage] \
         [--fd_threshold 0.9]
 """
@@ -107,14 +107,18 @@ def load_beta_fsaverage(
         "fsaverage",
         "betas_assumehrf",
     )
-    # Betas stored as .nii.gz with all trials in a session
-    beta_file = os.path.join(beta_dir, f"{hemi}.betas_session{session:02d}.nii.gz")
+    # Betas stored as .mgh for fsaverage surface space
+    beta_file = os.path.join(beta_dir, f"{hemi}.betas_session{session:02d}.mgh")
     if not os.path.exists(beta_file):
         return None
     img = nib.load(beta_file)
     data = img.get_fdata()
-    # data shape: (n_vertices, n_trials_in_session) or (n_trials, n_vertices)
-    if data.ndim == 2:
+    # .mgh format: shape is (n_vertices, 1, 1, n_trials)
+    if data.ndim == 4:
+        data = data[:, 0, 0, :]  # (n_vertices, n_trials)
+        if trial_in_session < data.shape[1]:
+            return data[:, trial_in_session].astype(np.float32)
+    elif data.ndim == 2:
         if trial_in_session < data.shape[-1]:
             return data[:, trial_in_session].astype(np.float32)
         elif trial_in_session < data.shape[0]:
@@ -291,8 +295,8 @@ def main():
     parser.add_argument(
         "--subjects",
         nargs="+",
-        default=[f"sub-{i:02d}" for i in range(1, 9)],
-        help="Subject IDs (default: sub-01 through sub-08).",
+        default=[f"subj{i:02d}" for i in range(1, 9)],
+        help="Subject IDs (default: subj01 through subj08).",
     )
     parser.add_argument(
         "--space",
