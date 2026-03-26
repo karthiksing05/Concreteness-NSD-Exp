@@ -9,3 +9,4 @@ nilearn
 matplotlib
 seaborn
 openpyxl
+h5py

@@ -140,6 +140,65 @@ def download_stim_info() -> bool:
     return False
 
 
+def download_stimuli() -> bool:
+    """
+    Download NSD stimulus images.
+    NSD provides a single HDF5 file (~20GB) containing all 73k images.
+    We download it, then extract individual PNGs for the scoring pipeline.
+    """
+    print("\n=== NSD Stimulus Images ===")
+    stim_dir = NSD_ROOT / "nsddata_stimuli" / "stimuli" / "nsd"
+    hdf5_relpath = "nsddata_stimuli/stimuli/nsd/nsd_stimuli.hdf5"
+    hdf5_local = nsd_local(hdf5_relpath)
+
+    # Check if PNGs already extracted
+    if stim_dir.exists():
+        existing = list(stim_dir.glob("*.png"))
+        if len(existing) >= 73000:
+            print(f"  [SKIP] {len(existing)} PNGs already exist in {stim_dir}")
+            return True
+
+    # Download HDF5 if needed
+    if not hdf5_local.exists():
+        print("  Downloading nsd_stimuli.hdf5 (~20GB) — this will take a while...")
+        ok = download_file(
+            nsd_url(hdf5_relpath), hdf5_local, "nsd_stimuli.hdf5"
+        )
+        if not ok:
+            return False
+
+    # Extract PNGs from HDF5
+    print("  Extracting individual PNGs from HDF5...")
+    try:
+        import h5py
+        from PIL import Image as PILImage
+
+        stim_dir.mkdir(parents=True, exist_ok=True)
+        with h5py.File(str(hdf5_local), "r") as f:
+            # NSD HDF5 has dataset 'imgBrick' with shape (73000, 425, 425, 3)
+            key = list(f.keys())[0]  # usually 'imgBrick'
+            dataset = f[key]
+            n_images = dataset.shape[0]
+            print(f"  Found {n_images} images in HDF5 (key='{key}')")
+            for i in range(n_images):
+                out_path = stim_dir / f"nsd-{i:05d}.png"
+                if out_path.exists():
+                    continue
+                img_array = dataset[i]
+                PILImage.fromarray(img_array).save(str(out_path))
+                if (i + 1) % 5000 == 0 or i == n_images - 1:
+                    print(f"    Extracted {i + 1}/{n_images}")
+        print(f"  Done — {n_images} PNGs in {stim_dir}")
+        return True
+    except ImportError as e:
+        print(f"  [FAIL] Need h5py and Pillow: {e}")
+        print("         pip install h5py Pillow")
+        return False
+    except Exception as e:
+        print(f"  [FAIL] HDF5 extraction error: {e}")
+        return False
+
+
 def download_rois(subjects: list[str] | None = None) -> bool:
     """Download ROI mask files for all subjects."""
     print("\n=== NSD ROI Masks (fsaverage surface) ===")
@@ -200,11 +259,6 @@ def download_betas(
         print(f"  {subject}: {n_sessions} sessions, {total_files} files")
 
     print("  WARNING: Each .mgh file is ~250-500MB. This will take significant time/space.")
-
-    response = input("  Continue? [y/N]: ").strip().lower()
-    if response != "y":
-        print("  Skipping beta download.")
-        return False
 
     all_ok = True
     for subject in subjects:
@@ -357,6 +411,8 @@ def main():
                         help="Download NSD stimulus info")
     parser.add_argument("--rois", action="store_true",
                         help="Download ROI masks for all subjects")
+    parser.add_argument("--stimuli", action="store_true",
+                        help="Download NSD stimulus images (LARGE, ~20GB)")
     parser.add_argument("--betas", action="store_true",
                         help="Download beta files (LARGE)")
     parser.add_argument("--coco", action="store_true",
@@ -373,7 +429,7 @@ def main():
 
     # If no flags, show help
     if not any([args.all, args.expdesign, args.stim_info, args.rois,
-                args.betas, args.coco, args.brysbaert, args.status]):
+                args.stimuli, args.betas, args.coco, args.brysbaert, args.status]):
         parser.print_help()
         print("\nTip: Run with --status to see what's already downloaded.")
         return
@@ -396,6 +452,9 @@ def main():
 
     if args.all or args.rois:
         results["rois"] = download_rois(args.subjects)
+
+    if args.all or args.stimuli:
+        results["stimuli"] = download_stimuli()
 
     if args.betas:
         results["betas"] = download_betas(args.subjects, args.sessions)
